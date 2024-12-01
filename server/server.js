@@ -10,7 +10,27 @@ const app = express();
 const cache = new NodeCache({ stdTTL: 300 }); // Cache for 5 minutes
 const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 hour
 
-app.use(cors());
+// CORS configuration
+app.use((req, res, next) => {
+  const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? ['https://news-aggregator.vercel.app', 'https://news-aggregator-git-main.vercel.app']
+    : ['http://localhost:5173'];
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
 app.use(express.json());
 
 const newsSources = {
