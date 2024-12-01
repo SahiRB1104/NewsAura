@@ -12,7 +12,7 @@ interface SummaryResponse {
   article: Article;
 }
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export const useArticleSummary = (articleId: string) => {
   const [summary, setSummary] = useState<ArticleSummary | null>(null);

@@ -12,15 +12,19 @@ const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 h
 
 // CORS configuration
 app.use((req, res, next) => {
-  // Allow requests from any Vercel deployment and localhost
-  const allowedOrigins = ['https://news-aggregator-git-main-dadvaiahpavan.vercel.app', 'http://localhost:5173'];
+  // Allow requests from all deployment URLs and localhost
+  const allowedOrigins = [
+    'https://news-portal-topaz.vercel.app',
+    'http://localhost:5173'
+  ];
+  
   const origin = req.headers.origin;
   
   if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
 
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   
   if (req.method === 'OPTIONS') {
