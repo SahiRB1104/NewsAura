@@ -12,18 +12,16 @@ const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 h
 
 // CORS configuration
 app.use((req, res, next) => {
-  const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? ['https://news-aggregator.vercel.app', 'https://news-aggregator-git-main.vercel.app']
-    : ['http://localhost:5173'];
-
+  // Allow requests from any Vercel deployment and localhost
+  const allowedOrigins = ['https://news-aggregator-git-main-dadvaiahpavan.vercel.app', 'http://localhost:5173'];
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
+  
+  if (allowedOrigins.includes(origin)) {
     res.header('Access-Control-Allow-Origin', origin);
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
