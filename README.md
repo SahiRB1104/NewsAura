@@ -2,7 +2,7 @@
 
 A sophisticated news aggregation platform built with React, Node.js, and modern web technologies. This application aggregates news from multiple sources, provides intelligent summaries, and offers a seamless reading experience.
 
-![News Aggregator Demo](https://your-demo-image-url.png)
+![News Aggregator Demo](https://i.ibb.co/j6JRD0L/Screenshot-2024-12-01-220015.png)
 
 ## ✨ Features
 
