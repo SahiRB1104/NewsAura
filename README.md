@@ -134,7 +134,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, email your-email@example.com or open an issue in the repository.
+For support, email pavannetha219@gmail.com or open an issue in the repository.
 
 ## 🚀 Deployment Instructions
 
@@ -224,4 +224,4 @@ For support, email your-email@example.com or open an issue in the repository.
 
 ---
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Pavan Dadvaiah
