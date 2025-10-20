@@ -39,3 +39,5 @@ export const useArticles = (category: Category) => {
 
   return { articles, loading, error };
 };
+
+export type { Category };

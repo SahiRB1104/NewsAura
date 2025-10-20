@@ -18,7 +18,7 @@ const ArticleGrid: React.FC<ArticleGridProps> = ({ articles }) => {
             animationFillMode: 'forwards'
           }}
         >
-          <ArticleCard article={article} />
+          <ArticleCard article={article as any} />
         </div>
       ))}
     </div>

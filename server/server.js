@@ -1,39 +1,49 @@
-import express from 'express';
-import cors from 'cors';
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import NodeCache from 'node-cache';
-import crypto from 'crypto';
-import { generateAdvancedSummary } from './summarizer.js';
+  import express from 'express';
+  import cors from 'cors';
+  import axios from 'axios';
+  import * as cheerio from 'cheerio';
+  import NodeCache from 'node-cache';
+  import crypto from 'crypto';
+  import { generateAdvancedSummary } from './summarizer.js';
+  import ttsRoutes from "./routes/tts.js"; 
+  import dotenv from "dotenv";
+  import sentimentRoutes from "./routes/sentimentRoutes.js";
+  import translateRoutes from "./routes/translate.js";
 
-const app = express();
-const cache = new NodeCache({ stdTTL: 300 }); // Cache for 5 minutes
-const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 hour
+  dotenv.config();
 
-// CORS configuration
-app.use((req, res, next) => {
-  // Allow requests from all deployment URLs and localhost
-  const allowedOrigins = [
-    'https://news-portal-topaz.vercel.app',
-    'http://localhost:5173'
-  ];
-  
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
+  const app = express();
+  const cache = new NodeCache({ stdTTL: 300 }); // Cache for 5 minutes
+  const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 hour
+  app.use(cors());
+  app.use(express.json());
+  app.use("/api/sentiment", sentimentRoutes);
+  app.use("/api", ttsRoutes);
+  app.use("/api", translateRoutes);
+  // CORS configuration
+  app.use((req, res, next) => {
+    // Allow requests from all deployment URLs and localhost
+    const allowedOrigins = [
+      'https://news-portal-topaz.vercel.app',
+      'http://localhost:5173'
+    ];
+    
+    const origin = req.headers.origin;
+    
+    if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
 
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
 
-app.use(express.json());
+
 
 const newsSources = {
   top: [

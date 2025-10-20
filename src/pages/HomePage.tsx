@@ -1,10 +1,11 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import ArticleGrid from '../components/ArticleGrid';
-import { useArticles } from '../hooks/useArticles';
+import { useArticles, Category } from '../hooks/useArticles';
 
 const HomePage = () => {
-  const { category = 'top' } = useParams();
+  // Assert that category is of type Category
+  const { category = 'top' } = useParams<{ category?: Category }>();
   const { articles, loading, error } = useArticles(category);
 
   if (loading) {

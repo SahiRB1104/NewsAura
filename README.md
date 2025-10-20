@@ -35,8 +35,8 @@ A sophisticated news aggregation platform built with React, Node.js, and modern 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/DadvaiahPavan/NewsAggregator.git
-   cd news-aggregator
+   git clone 
+   cd newsaura
    ```
 
 2. **Install dependencies**
@@ -113,13 +113,7 @@ NODE_ENV=development
 - Error handling
 - Secure HTTP headers
 
-## 🤝 Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
 ## 📝 License
 
@@ -132,9 +126,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - UI/UX inspiration sources
 - Contributors and testers
 
-## 📞 Support
 
-For support, email pavannetha219@gmail.com or open an issue in the repository.
+
 
 ## 🚀 Deployment Instructions
 
@@ -224,4 +217,4 @@ For support, email pavannetha219@gmail.com or open an issue in the repository.
 
 ---
 
-Made with ❤️ by Pavan Dadvaiah
+
