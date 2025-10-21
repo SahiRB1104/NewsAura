@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useParams } from 'react-router-dom';
 import ArticleGrid from '../components/ArticleGrid';
 import { useArticles, Category } from '../hooks/useArticles';

@@ -5,21 +5,28 @@
   import NodeCache from 'node-cache';
   import crypto from 'crypto';
   import { generateAdvancedSummary } from './summarizer.js';
-  import ttsRoutes from "./routes/tts.js"; 
+ 
   import dotenv from "dotenv";
   import sentimentRoutes from "./routes/sentimentRoutes.js";
-  import translateRoutes from "./routes/translate.js";
+  import translateRouter from "./routes/translate.js";
+  import ttsRoute from "./routes/tts.js"; 
+
 
   dotenv.config();
 
   const app = express();
   const cache = new NodeCache({ stdTTL: 300 }); // Cache for 5 minutes
   const articlesCache = new NodeCache({ stdTTL: 3600 }); // Cache articles for 1 hour
+  
   app.use(cors());
   app.use(express.json());
+
+
   app.use("/api/sentiment", sentimentRoutes);
-  app.use("/api", ttsRoutes);
-  app.use("/api", translateRoutes);
+  app.use("/api", ttsRoute); 
+  app.use("/api/translate", translateRouter);
+  app.use("/tts", express.static("./tmp_tts"));
+
   // CORS configuration
   app.use((req, res, next) => {
     // Allow requests from all deployment URLs and localhost

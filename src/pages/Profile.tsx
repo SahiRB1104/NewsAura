@@ -113,7 +113,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="flex justify-center items-center h-screen bg-gradient-to-br from-white to-green-50 px-6 relative">
-      <div className="bg-green-600 bg-opacity-100 backdrop-blur-xl border border-white/30 rounded-2xl p-8 w-[420px] shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300">
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-opacity-100 backdrop-blur-xl border border-white/30 rounded-2xl p-8 w-[420px] shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300">
 
         {/* ✅ Profile Header */}
         <div className="flex flex-col items-center mb-6">
@@ -207,7 +207,7 @@ const Profile: React.FC = () => {
 
           <button
             onClick={handleLogout}
-            className="flex items-center text-red-100 hover:text-red-300 transition"
+            className="flex items-center text-red-700 hover:text-red-300 transition"
           >
             <LogOut className="h-4 w-4 mr-1" />
             Logout

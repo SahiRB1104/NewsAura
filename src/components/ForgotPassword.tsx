@@ -32,7 +32,7 @@ const ForgotPassword: React.FC = () => {
 
   return (
     <div className="flex justify-center items-center h-screen bg-gradient-to-br from-white to-green-50">
-      <div className="bg-green-600 bg-opacity-100 backdrop-blur-xl border border-white/30 rounded-2xl p-8 w-[400px] shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 bg-opacity-100 backdrop-blur-xl border border-white/30 rounded-2xl p-8 w-[400px] shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02]">
 
         <h1 className="text-center text-2xl font-semibold text-white mb-3">
           Forgot Password
