@@ -8,6 +8,7 @@
     "build": "echo 'No build step required'"
   },
   "dependencies": {
+    "@aws-sdk/client-polly": "^3.914.0",
     "@google-cloud/translate": "^9.2.0",
     "@google/genai": "^1.25.0",
     "@vitalets/google-translate-api": "^9.2.1",

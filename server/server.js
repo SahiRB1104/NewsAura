@@ -23,7 +23,7 @@
 
 
   app.use("/api/sentiment", sentimentRoutes);
-  app.use("/api", ttsRoute); 
+  app.use("/api/tts", ttsRoute);
   app.use("/api/translate", translateRouter);
   app.use("/tts", express.static("./tmp_tts"));
 

@@ -1,115 +1,109 @@
 import express from "express";
-import { GoogleGenAI } from "@google/genai";
 import NodeCache from "node-cache";
 import gTTS from "gtts";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
+import dotenv from "dotenv";
 
+dotenv.config();
 const router = express.Router();
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// 🕒 File cache for 30 minutes (1800 seconds)
-const ttsCache = new NodeCache({ stdTTL: 1800, checkperiod: 60 }); 
-
-// 🎧 Directory for saved MP3s
+// 🗂️ Temp folder
 const TMP_DIR = path.resolve("./tmp_tts");
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR);
 
-// 🧹 Delete expired files automatically
-ttsCache.on("del", (key, fileName) => {
-  const filePath = path.join(TMP_DIR, fileName);
-  if (fs.existsSync(filePath)) {
-    fs.unlink(filePath, (err) => {
-      if (!err) console.log(`🗑️ Deleted expired TTS file: ${fileName}`);
-    });
-  }
+// 🕒 Cache 4 hours
+const ttsCache = new NodeCache({ stdTTL: 14400, checkperiod: 600 });
+ttsCache.on("del", (k, f) => {
+  const file = path.join(TMP_DIR, f);
+  if (fs.existsSync(file)) fs.unlink(file, () => console.log(`🗑️ Deleted ${f}`));
 });
 
-function extractBase64(raw) {
-  if (!raw) return null;
-  const cleaned = raw
-    .replace(/```(?:json|base64)?/g, "")
-    .replace(/```/g, "")
-    .replace(/[^\w+/=]/g, "")
-    .trim();
-  return cleaned.length > 100 ? cleaned : null;
-}
+const gttsSupported = ["hi", "bn", "gu", "kn", "ml", "ta", "te", "en"];
+
+// 🔊 AWS Polly setup
+const polly = new PollyClient({
+  region: process.env.AWS_REGION || "ap-south-1",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// Marathi / Punjabi voice mapping
+const pollyVoiceMap = {
+  mr: { LanguageCode: "hi-IN", VoiceId: "Aditi" }, // Marathi not native, Hindi voice fallback
+  pa: { LanguageCode: "pa-IN", VoiceId: "Kajal" }, // Punjabi voice
+};
 
 function safeFileName(text, lang) {
   return crypto.createHash("md5").update(`${lang}:${text}`).digest("hex") + ".mp3";
 }
 
-// 🎤 Generate or return TTS
-router.post("/tts", async (req, res) => {
+async function generatePollyTTS(text, lang, filePath) {
+  const config = pollyVoiceMap[lang];
+  if (!config) throw new Error(`No Polly config for ${lang}`);
+
+  console.log(`🎧 Using Amazon Polly for [${lang}]...`);
+  const command = new SynthesizeSpeechCommand({
+    OutputFormat: "mp3",
+    Text: text,
+    VoiceId: config.VoiceId,
+    LanguageCode: config.LanguageCode,
+  });
+
+  const { AudioStream } = await polly.send(command);
+  if (!AudioStream) throw new Error("No audio from Polly");
+
+  const buffer = Buffer.from(await AudioStream.transformToByteArray());
+  fs.writeFileSync(filePath, buffer);
+  console.log(`✅ Polly TTS generated for [${lang}]`);
+}
+
+// 🧩 Main route
+router.post("/", async (req, res) => {
   const { text, language = "en" } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
 
-  const cacheKey = `${language}:${text.slice(0, 200)}`;
   const fileName = safeFileName(text, language);
   const filePath = path.join(TMP_DIR, fileName);
 
-  // ✅ Return cached file if exists
+  // 🧠 Cached?
   if (fs.existsSync(filePath)) {
-    console.log("🎧 Using cached TTS:", fileName);
-    ttsCache.set(cacheKey, fileName); // refresh TTL
+    ttsCache.set(fileName, fileName);
     return res.json({ success: true, url: `/tts/${fileName}`, cached: true });
   }
 
   try {
     console.log(`🎙️ Generating new TTS for [${language}]...`);
 
-    const prompt = `
-      Convert the text below into an MP3 voice audio encoded in base64 (no headers, no explanation).
-      Text in ${language}:
-      """${text}"""
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
-
-    const raw =
-      response.output_text ||
-      response.text ||
-      response.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "";
-
-    const base64 = extractBase64(raw);
-    if (base64) {
-      const buffer = Buffer.from(base64, "base64");
-      if (buffer.length > 1000) {
-        fs.writeFileSync(filePath, buffer);
-        ttsCache.set(cacheKey, fileName);
-        console.log(`✅ Saved Gemini TTS: ${fileName}`);
-        return res.json({ success: true, url: `/tts/${fileName}`, cached: false });
-      }
-    }
-
-    throw new Error("Gemini returned invalid audio");
-  } catch (err) {
-    console.warn("⚠️ Gemini TTS failed:", err.message);
-    console.log("➡️ Falling back to gTTS...");
-
-    try {
+    if (gttsSupported.includes(language)) {
+      // 🟢 gTTS default
       const gtts = new gTTS(text, language);
       await new Promise((resolve, reject) => {
-        const writeStream = fs.createWriteStream(filePath);
-        gtts.stream()
+        const ws = fs.createWriteStream(filePath);
+        gtts
+          .stream()
           .on("error", reject)
-          .pipe(writeStream)
+          .pipe(ws)
           .on("finish", resolve)
           .on("error", reject);
       });
-
-      console.log(`✅ gTTS fallback saved: ${fileName}`);
-      ttsCache.set(cacheKey, fileName);
-      return res.json({ success: true, url: `/tts/${fileName}`, cached: false });
-    } catch (fallbackErr) {
-      console.error("❌ Final TTS Failure:", fallbackErr);
-      return res.status(500).json({ error: "Failed to generate TTS" });
+      console.log(`✅ gTTS saved: ${fileName}`);
+    } else if (["mr", "pa"].includes(language)) {
+      // 🟣 Polly fallback
+      await generatePollyTTS(text, language, filePath);
+    } else {
+      throw new Error(`Language '${language}' not supported`);
     }
+
+    ttsCache.set(fileName, fileName);
+    res.json({ success: true, url: `/tts/${fileName}` });
+  } catch (err) {
+    console.error("❌ Final TTS failure:", err.message);
+    res.status(500).json({ error: "TTS generation failed", details: err.message });
   }
 });
 

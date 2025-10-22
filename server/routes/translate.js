@@ -1,27 +1,46 @@
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import NodeCache from "node-cache";
-import pkg from "@vitalets/google-translate-api";
-const translate = pkg.default;
- // ✅ Free fallback translator
+import { createRequire } from "module";
 
 const router = express.Router();
 
-// ✅ Gemini Client Setup (latest GenAI SDK)
+/* ──────────────────────────────────────────────
+   ✅ Load CommonJS module safely using createRequire
+────────────────────────────────────────────── */
+let translateFn = null;
+try {
+  const require = createRequire(import.meta.url);
+  const translate = require("@vitalets/google-translate-api");
+  translateFn = translate.default || translate.translate || translate;
+  if (typeof translateFn !== "function") {
+    throw new Error("translateFn not callable");
+  }
+  console.log("✅ Fallback translator ready (via createRequire)");
+} catch (err) {
+  console.error("❌ Fallback translator initialization failed:", err.message);
+}
+
+/* ──────────────────────────────────────────────
+   🔑 Gemini GenAI Setup
+────────────────────────────────────────────── */
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
-// ✅ Cache translations (1 hour)
+/* ──────────────────────────────────────────────
+   🧠 Translation Cache (1 hour)
+────────────────────────────────────────────── */
 const translationCache = new NodeCache({ stdTTL: 3600 });
 
-// ✅ Supported language codes
+/* ──────────────────────────────────────────────
+   🌍 Supported Languages (Added Marathi)
+────────────────────────────────────────────── */
 const supportedLangs = [
   "en", "hi", "mr", "ta", "te", "gu", "kn", "ml", "bn", "pa",
   "fr", "de", "es", "ja", "zh"
 ];
 
-// ✅ Mapping for clarity in prompts
 const languageNames = {
   en: "English",
   hi: "Hindi",
@@ -40,25 +59,22 @@ const languageNames = {
   zh: "Chinese (Simplified)"
 };
 
-/**
- * @route POST /api/translate
- * @desc Translate text using Gemini 2.0, fallback to free translator if fails or for Marathi
- */
+/* ──────────────────────────────────────────────
+   🚀 POST /api/translate
+────────────────────────────────────────────── */
 router.post("/", async (req, res) => {
+  const { text, targetLang } = req.body;
+
+  if (!text || !targetLang) {
+    return res.status(400).json({ error: "Missing text or targetLang" });
+  }
+
+  if (!supportedLangs.includes(targetLang)) {
+    return res.status(400).json({ error: `Language '${targetLang}' not supported` });
+  }
+
   try {
-    const { text, targetLang } = req.body;
-
-    if (!text || !targetLang) {
-      return res.status(400).json({ error: "Missing text or targetLang" });
-    }
-
-    if (!supportedLangs.includes(targetLang)) {
-      return res.status(400).json({
-        error: `Language '${targetLang}' not supported`,
-      });
-    }
-
-    // ✅ Check cache
+    // ✅ Cache check
     const cacheKey = `${targetLang}:${text.slice(0, 200)}`;
     const cached = translationCache.get(cacheKey);
     if (cached) {
@@ -66,26 +82,8 @@ router.post("/", async (req, res) => {
       return res.json(cached);
     }
 
-    // ✅ Special rule: Marathi should use fallback directly (Gemini often returns Hindi)
-    if (targetLang === "mr") {
-      console.log("🪄 Marathi detected — using fallback translator directly");
-      const fallback = await translate(text, { to: "mr" });
-
-      const result = {
-        success: true,
-        translatedText: fallback.text,
-        targetLang,
-        model: "fallback-google-translate",
-        source: "Forced Fallback (Marathi)",
-      };
-
-      translationCache.set(cacheKey, result);
-      return res.json(result);
-    }
-
     console.log(`🌐 Translating to ${targetLang} using Gemini 2.0...`);
 
-    // ✅ Improved Gemini translation prompt
     const prompt = `
 You are an expert multilingual translator fluent in all Indian and international languages.
 Translate the following text into **${languageNames[targetLang]} (${targetLang})**.
@@ -97,7 +95,7 @@ Text:
 """${text}"""
 `;
 
-    // ✅ Call Gemini API
+    // 🧠 Gemini translation attempt
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -106,11 +104,10 @@ Text:
     const translatedText =
       response.output_text?.trim() ||
       response.text?.trim() ||
+      response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
       "";
 
-    if (!translatedText || translatedText.length < 2) {
-      throw new Error("Empty translation from Gemini");
-    }
+    if (!translatedText) throw new Error("Empty translation from Gemini");
 
     const result = {
       success: true,
@@ -126,12 +123,18 @@ Text:
   } catch (error) {
     console.error("⚠️ Gemini translation failed:", error.message);
 
-    // ✅ FALLBACK: Free Google Translate API for all others
-    try {
-      const { text, targetLang } = req.body;
-      console.log(`🔄 Using fallback translator for ${targetLang}...`);
+    if (error.message.includes("RESOURCE_EXHAUSTED")) {
+      console.warn("⚠️ Gemini quota exceeded — switching to fallback translator...");
+    }
 
-      const fallback = await translate(text, { to: targetLang });
+    // ✅ FALLBACK: Google Translate API
+    try {
+      if (!translateFn || typeof translateFn !== "function") {
+        throw new Error("translateFn not callable (fallback unavailable)");
+      }
+
+      console.log(`🔄 Using fallback translator for ${targetLang}...`);
+      const fallback = await translateFn(text, { to: targetLang });
 
       const result = {
         success: true,
@@ -142,6 +145,7 @@ Text:
       };
 
       translationCache.set(`${targetLang}:${text.slice(0, 200)}`, result);
+      console.log("✅ Fallback translation successful");
       res.json(result);
     } catch (fallbackError) {
       console.error("❌ Fallback translation failed:", fallbackError.message);

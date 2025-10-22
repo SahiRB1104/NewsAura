@@ -12,11 +12,11 @@ const categoryColors = {
   technology: "from-indigo-500 to-blue-500",
 };
 
-// 🌍 Supported languages (expanded)
+// 🌍 Supported languages
 const supportedLanguages: Record<string, string> = {
   en: "English",
   hi: "Hindi",
-  
+  mr: "Marathi",
   ta: "Tamil",
   te: "Telugu",
   gu: "Gujarati",
@@ -30,6 +30,12 @@ const supportedLanguages: Record<string, string> = {
   ja: "Japanese",
   zh: "Chinese",
 };
+
+// TTS supported languages should match backend
+const supportedTtsLanguages = [
+  "en", "hi", "mr", "ta", "te", "gu", "kn", "ml", "bn", "pa",
+  "fr", "es", "de", "ja", "zh"
+];
 
 const SummaryPage = () => {
   const { id } = useParams();
@@ -48,6 +54,8 @@ const SummaryPage = () => {
   const [speaking, setSpeaking] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioObjectUrlRef = useRef<string | null>(null);
+  const isTtsSupported = supportedTtsLanguages.includes(language);
 
   // 📝 Fetch translation from backend
   const translateText = async (text: string, lang: string) => {
@@ -56,13 +64,19 @@ const SummaryPage = () => {
       const res = await fetch("http://localhost:3000/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, targetLang: lang }), // ✅ FIXED key
+        body: JSON.stringify({ text, targetLang: lang }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Translation failed");
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: await res.text() };
 
-      // ✅ Correct property
+      if (!res.ok) {
+        const errMsg = data?.error || `Translate API returned ${res.status}`;
+        throw new Error(errMsg);
+      }
+
       setTranslatedSummary(data.translatedText || text);
     } catch (err) {
       console.error("Translation failed:", err);
@@ -83,63 +97,100 @@ const SummaryPage = () => {
     }
   }, [summary, language]);
 
-  // 🔊 Generate TTS
-  // Inside SummaryPage component
-const handleSpeak = async () => {
-  const textToSpeak = translatedSummary || summary?.content;
-  if (!textToSpeak) return;
+  // 🧠 Dynamic TTS switching — stop old & play new language
+  useEffect(() => {
+    if (speaking && audioRef.current) {
+      console.log(`🔄 Language switched to ${language} — stopping current TTS`);
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setSpeaking(false);
 
-  try {
-    // If audio already exists and is paused → just resume
-    if (audioRef.current && !ttsLoading && audioRef.current.src && audioRef.current.paused) {
-      audioRef.current.play();
-      setSpeaking(true);
+      // Auto-play new TTS after short delay
+      setTimeout(() => {
+        console.log(`🎙️ Starting new TTS in ${language}`);
+        handleSpeak();
+      }, 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
+  // 🔊 Generate TTS
+  const handleSpeak = async () => {
+    const textToSpeak = translatedSummary || summary?.content;
+    if (!textToSpeak) return;
+
+    if (!isTtsSupported) {
+      console.error(`TTS not supported for selected language: ${language}`);
+      alert(`TTS not supported for ${supportedLanguages[language]}`);
       return;
     }
 
-    setTtsLoading(true);
-    setSpeaking(true);
+    try {
+      // Stop existing audio (avoid overlap)
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
 
-    // Request new audio from backend
-    const res = await fetch("http://localhost:3000/api/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: textToSpeak, language }),
-    });
+      setTtsLoading(true);
+      setSpeaking(true);
 
-    const data = await res.json();
-    if (!res.ok || !data.url) throw new Error(data.error || "TTS failed");
+      const res = await fetch("http://localhost:3000/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textToSpeak, language }),
+      });
 
-    const fileUrl = `http://localhost:3000${data.url}`;
-    console.log("🔊 Playing:", fileUrl);
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "TTS failed");
 
-    // Play audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = fileUrl;
-      audioRef.current.oncanplaythrough = () => {
-        audioRef.current?.play().catch((err) => {
-          console.error("Audio playback failed:", err);
-          setSpeaking(false);
-        });
-      };
+      const fileUrl = data.url.startsWith("http")
+        ? data.url
+        : `http://localhost:3000${data.url}`;
+
+      const audioResp = await fetch(fileUrl);
+      if (!audioResp.ok) throw new Error("Failed to download TTS audio");
+
+      const blob = await audioResp.blob();
+      if (!blob.type.startsWith("audio/")) {
+        throw new Error("Received non-audio response for TTS");
+      }
+
+      // Cleanup old audio URL
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current);
+        audioObjectUrlRef.current = null;
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      audioObjectUrlRef.current = objectUrl;
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = objectUrl;
+        audioRef.current.load();
+        audioRef.current.oncanplaythrough = () => {
+          audioRef.current?.play().catch((err) => {
+            console.error("Audio playback failed:", err);
+            setSpeaking(false);
+          });
+        };
+      }
+    } catch (err) {
+      console.error("TTS Error:", err);
+      setSpeaking(false);
+    } finally {
+      setTtsLoading(false);
     }
-  } catch (err) {
-    console.error("TTS Error:", err);
+  };
+
+  // 🟡 Stop should only pause
+  const handleStop = () => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
     setSpeaking(false);
-  } finally {
-    setTtsLoading(false);
-  }
-};
-
-// 🟡 Stop should only pause — not reset
-const handleStop = () => {
-  if (audioRef.current && !audioRef.current.paused) {
-    audioRef.current.pause(); // just pause
-  }
-  setSpeaking(false);
-};
-
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -194,7 +245,7 @@ const handleStop = () => {
                     className="px-3 py-2 border rounded-lg shadow bg-white text-gray-700 min-w-[160px]"
                   >
                     <optgroup label="🌏 Indian Languages">
-                      {["hi",  "ta", "te", "gu", "kn", "ml", "bn", "pa"].map((code) => (
+                      {["hi", "mr", "ta", "te", "gu", "kn", "ml", "bn", "pa"].map((code) => (
                         <option key={code} value={code}>
                           {supportedLanguages[code]}
                         </option>
@@ -209,6 +260,9 @@ const handleStop = () => {
                     </optgroup>
                   </select>
                   {translating && <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />}
+                  <div className="text-sm text-gray-600 ml-4">
+                    Selected: <strong>{supportedLanguages[language]}</strong>
+                  </div>
                 </div>
 
                 {/* 📝 Summary Text */}
@@ -224,47 +278,46 @@ const handleStop = () => {
 
                 {/* 🔊 TTS Controls */}
                 <div className="mt-6 flex gap-4 items-center">
-  {ttsLoading ? (
-    <button
-      disabled
-      className="flex items-center px-4 py-2 bg-gray-400 text-white rounded-lg shadow cursor-not-allowed"
-    >
-      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-      Generating...
-    </button>
-  ) : (
-    <>
-      {!speaking ? (
-        <button
-          onClick={handleSpeak}
-          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg shadow hover:bg-indigo-600 transition"
-        >
-          <Volume2 className="h-5 w-5 mr-2" />
-          {audioRef.current && audioRef.current.paused && audioRef.current.currentTime > 0
-            ? "Resume"
-            : "Listen"}
-        </button>
-      ) : (
-        <button
-          onClick={handleStop}
-          className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition"
-        >
-          <Square className="h-5 w-5 mr-2" />
-          Pause
-        </button>
-      )}
-    </>
-  )}
-</div>
+                  {ttsLoading ? (
+                    <button
+                      disabled
+                      className="flex items-center px-4 py-2 bg-gray-400 text-white rounded-lg shadow cursor-not-allowed"
+                    >
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      Generating...
+                    </button>
+                  ) : (
+                    <>
+                      {!speaking ? (
+                        <button
+                          onClick={handleSpeak}
+                          disabled={!isTtsSupported || translating || ttsLoading}
+                          className={`flex items-center px-4 py-2 rounded-lg shadow transition ${
+                            isTtsSupported && !translating && !ttsLoading
+                              ? "bg-indigo-500 text-white hover:bg-indigo-600"
+                              : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                          }`}
+                        >
+                          <Volume2 className="h-5 w-5 mr-2" />
+                          {audioRef.current && audioRef.current.paused && audioRef.current.currentTime > 0
+                            ? "Resume"
+                            : "Listen"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleStop}
+                          className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition"
+                        >
+                          <Square className="h-5 w-5 mr-2" />
+                          Pause
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
 
-{/* 🎵 Hidden Audio */}
-<audio
-  ref={audioRef}
-  onEnded={() => {
-    setSpeaking(false);
-  }}
-/>
-
+                {/* 🎵 Hidden Audio */}
+                <audio ref={audioRef} onEnded={() => setSpeaking(false)} />
 
                 {/* 🔗 Original Article */}
                 <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">

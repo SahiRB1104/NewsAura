@@ -1,1 +1,5 @@
 .env
+.tmp_tts
+tmp_tts
+.public
+tts_audio
