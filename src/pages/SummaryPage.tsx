@@ -12,30 +12,40 @@ const categoryColors = {
   technology: "from-indigo-500 to-blue-500",
 };
 
-// 🌍 Supported languages
+// 🌍 Supported Languages
 const supportedLanguages: Record<string, string> = {
+  // 🇮🇳 Indian
   en: "English",
   hi: "Hindi",
-  mr: "Marathi",
-  ta: "Tamil",
-  te: "Telugu",
+  bn: "Bengali",
   gu: "Gujarati",
   kn: "Kannada",
   ml: "Malayalam",
-  bn: "Bengali",
-  pa: "Punjabi",
+  ta: "Tamil",
+  te: "Telugu",
+  ur: "Urdu",
+
+  // 🌐 Global
   fr: "French",
-  es: "Spanish",
   de: "German",
+  es: "Spanish",
+  it: "Italian",
   ja: "Japanese",
-  zh: "Chinese",
+  ko: "Korean",
+  "zh-CN": "Chinese (Simplified)",
+  ru: "Russian",
+  ar: "Arabic",
 };
 
-// TTS supported languages should match backend
-const supportedTtsLanguages = [
-  "en", "hi", "mr", "ta", "te", "gu", "kn", "ml", "bn", "pa",
-  "fr", "es", "de", "ja", "zh"
-];
+const supportedTtsLanguages = Object.keys(supportedLanguages);
+
+// 🕒 Helper to format seconds → mm:ss
+const formatTime = (sec: number) => {
+  if (!isFinite(sec)) return "0:00";
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
 
 const SummaryPage = () => {
   const { id } = useParams();
@@ -45,19 +55,25 @@ const SummaryPage = () => {
   const category = location.state?.category || "top";
   const gradientColor = categoryColors[category as keyof typeof categoryColors];
 
-  // 🌍 Translation states
   const [language, setLanguage] = useState("en");
   const [translatedSummary, setTranslatedSummary] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
 
-  // 🔊 TTS states
+  // 🔊 Audio states
   const [speaking, setSpeaking] = useState(false);
   const [ttsLoading, setTtsLoading] = useState(false);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioProgress, setAudioProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const isTtsSupported = supportedTtsLanguages.includes(language);
 
-  // 📝 Fetch translation from backend
+  // 📊 Word count
+  const wordCount = (translatedSummary || summary?.content || "")
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  // 🧠 Translate API
   const translateText = async (text: string, lang: string) => {
     try {
       setTranslating(true);
@@ -66,17 +82,8 @@ const SummaryPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, targetLang: lang }),
       });
-
-      const contentType = res.headers.get("content-type") || "";
-      const data = contentType.includes("application/json")
-        ? await res.json()
-        : { error: await res.text() };
-
-      if (!res.ok) {
-        const errMsg = data?.error || `Translate API returned ${res.status}`;
-        throw new Error(errMsg);
-      }
-
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Translate API error");
       setTranslatedSummary(data.translatedText || text);
     } catch (err) {
       console.error("Translation failed:", err);
@@ -86,52 +93,34 @@ const SummaryPage = () => {
     }
   };
 
-  // 🔄 Auto-translate when language changes
   useEffect(() => {
     if (summary?.content) {
-      if (language === "en") {
-        setTranslatedSummary(summary.content);
-      } else {
-        translateText(summary.content, language);
-      }
+      if (language === "en") setTranslatedSummary(summary.content);
+      else translateText(summary.content, language);
     }
   }, [summary, language]);
 
-  // 🧠 Dynamic TTS switching — stop old & play new language
+  // 🔄 Language switch stops + restarts
   useEffect(() => {
     if (speaking && audioRef.current) {
-      console.log(`🔄 Language switched to ${language} — stopping current TTS`);
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setSpeaking(false);
-
-      // Auto-play new TTS after short delay
-      setTimeout(() => {
-        console.log(`🎙️ Starting new TTS in ${language}`);
-        handleSpeak();
-      }, 500);
+      setTimeout(() => handleSpeak(), 500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
-  // 🔊 Generate TTS
+  // 🎤 Generate TTS
   const handleSpeak = async () => {
     const textToSpeak = translatedSummary || summary?.content;
-    if (!textToSpeak) return;
-
-    if (!isTtsSupported) {
-      console.error(`TTS not supported for selected language: ${language}`);
-      alert(`TTS not supported for ${supportedLanguages[language]}`);
-      return;
-    }
+    if (!textToSpeak || !isTtsSupported) return;
 
     try {
-      // Stop existing audio (avoid overlap)
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
-
       setTtsLoading(true);
       setSpeaking(true);
 
@@ -147,55 +136,46 @@ const SummaryPage = () => {
       const fileUrl = data.url.startsWith("http")
         ? data.url
         : `http://localhost:3000${data.url}`;
-
       const audioResp = await fetch(fileUrl);
-      if (!audioResp.ok) throw new Error("Failed to download TTS audio");
+      if (!audioResp.ok) throw new Error("Failed to load TTS audio");
 
       const blob = await audioResp.blob();
-      if (!blob.type.startsWith("audio/")) {
-        throw new Error("Received non-audio response for TTS");
-      }
-
-      // Cleanup old audio URL
-      if (audioObjectUrlRef.current) {
-        URL.revokeObjectURL(audioObjectUrlRef.current);
-        audioObjectUrlRef.current = null;
-      }
-
+      if (audioObjectUrlRef.current) URL.revokeObjectURL(audioObjectUrlRef.current);
       const objectUrl = URL.createObjectURL(blob);
       audioObjectUrlRef.current = objectUrl;
 
       if (audioRef.current) {
-        audioRef.current.pause();
         audioRef.current.src = objectUrl;
         audioRef.current.load();
         audioRef.current.oncanplaythrough = () => {
-          audioRef.current?.play().catch((err) => {
-            console.error("Audio playback failed:", err);
-            setSpeaking(false);
-          });
+          audioRef.current?.play();
+          setSpeaking(true);
         };
       }
     } catch (err) {
-      console.error("TTS Error:", err);
+      console.error("TTS error:", err);
       setSpeaking(false);
     } finally {
       setTtsLoading(false);
     }
   };
 
-  // 🟡 Stop should only pause
+  // ⏸️ Pause / Resume
   const handleStop = () => {
-    if (audioRef.current && !audioRef.current.paused) {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) {
+      audioRef.current.play();
+      setSpeaking(true);
+    } else {
       audioRef.current.pause();
+      setSpeaking(false);
     }
-    setSpeaking(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4">
-        {/* 🔙 Back Button */}
+        {/* 🔙 Back */}
         <Link
           to={`/category/${category}`}
           className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-8 group"
@@ -208,7 +188,6 @@ const SummaryPage = () => {
           </span>
         </Link>
 
-        {/* 🕓 Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center min-h-[50vh]">
             <Loader2 className="w-10 h-10 animate-spin text-gray-500" />
@@ -216,7 +195,6 @@ const SummaryPage = () => {
           </div>
         )}
 
-        {/* ❌ Error */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
             <h3 className="text-red-800 font-medium">Error loading summary</h3>
@@ -224,14 +202,15 @@ const SummaryPage = () => {
           </div>
         )}
 
-        {/* ✅ Summary Section */}
         {summary && (
           <div className="transform transition-all duration-500 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               <div className={`bg-gradient-to-r ${gradientColor} p-8`}>
                 <div className="flex items-center">
                   <BookOpen className="h-8 w-8 text-white opacity-75" />
-                  <h1 className="ml-3 text-2xl font-bold text-white">{summary.title}</h1>
+                  <h1 className="ml-3 text-2xl font-bold text-white">
+                    {summary.title}
+                  </h1>
                 </div>
               </div>
 
@@ -242,17 +221,17 @@ const SummaryPage = () => {
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="px-3 py-2 border rounded-lg shadow bg-white text-gray-700 min-w-[160px]"
+                    className="px-3 py-2 border rounded-lg shadow bg-white text-gray-700 min-w-[180px]"
                   >
-                    <optgroup label="🌏 Indian Languages">
-                      {["hi", "mr", "ta", "te", "gu", "kn", "ml", "bn", "pa"].map((code) => (
+                    <optgroup label="🇮🇳 Indian Languages">
+                      {["en", "hi", "bn", "gu", "kn", "ml", "ta", "te", "ur"].map((code) => (
                         <option key={code} value={code}>
                           {supportedLanguages[code]}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="🌐 Global Languages">
-                      {["en", "fr", "es", "de", "ja", "zh"].map((code) => (
+                      {["fr", "de", "es", "it", "ja", "ko", "zh-CN", "ru", "ar"].map((code) => (
                         <option key={code} value={code}>
                           {supportedLanguages[code]}
                         </option>
@@ -260,12 +239,12 @@ const SummaryPage = () => {
                     </optgroup>
                   </select>
                   {translating && <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />}
-                  <div className="text-sm text-gray-600 ml-4">
-                    Selected: <strong>{supportedLanguages[language]}</strong>
-                  </div>
+                  <span className="text-sm text-gray-600 ml-4">
+                    Words: <strong>{wordCount}</strong>
+                  </span>
                 </div>
 
-                {/* 📝 Summary Text */}
+                {/* 📝 Summary */}
                 <div className="prose prose-lg max-w-none">
                   {(translatedSummary || summary.content)
                     .split("\n")
@@ -277,18 +256,18 @@ const SummaryPage = () => {
                 </div>
 
                 {/* 🔊 TTS Controls */}
-                <div className="mt-6 flex gap-4 items-center">
-                  {ttsLoading ? (
-                    <button
-                      disabled
-                      className="flex items-center px-4 py-2 bg-gray-400 text-white rounded-lg shadow cursor-not-allowed"
-                    >
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Generating...
-                    </button>
-                  ) : (
-                    <>
-                      {!speaking ? (
+                <div className="mt-6 flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    {ttsLoading ? (
+                      <button
+                        disabled
+                        className="flex items-center px-4 py-2 bg-gray-400 text-white rounded-lg shadow cursor-not-allowed"
+                      >
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Generating...
+                      </button>
+                    ) : (
+                      <>
                         <button
                           onClick={handleSpeak}
                           disabled={!isTtsSupported || translating || ttsLoading}
@@ -299,25 +278,60 @@ const SummaryPage = () => {
                           }`}
                         >
                           <Volume2 className="h-5 w-5 mr-2" />
-                          {audioRef.current && audioRef.current.paused && audioRef.current.currentTime > 0
-                            ? "Resume"
-                            : "Listen"}
+                          Listen
                         </button>
-                      ) : (
+
                         <button
                           onClick={handleStop}
+                          disabled={!audioRef.current}
                           className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition"
                         >
                           <Square className="h-5 w-5 mr-2" />
-                          Pause
+                          {speaking ? "Pause" : "Resume"}
                         </button>
-                      )}
-                    </>
-                  )}
-                </div>
+                      </>
+                    )}
+                  </div>
 
-                {/* 🎵 Hidden Audio */}
-                <audio ref={audioRef} onEnded={() => setSpeaking(false)} />
+                  {/* 🎵 Audio Player Bar */}
+                  <div className="flex flex-col gap-1 text-sm text-gray-600">
+                    <input
+                      type="range"
+                      min={0}
+                      max={audioDuration || 0}
+                      step={0.1}
+                      value={audioProgress}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (audioRef.current) audioRef.current.currentTime = val;
+                        setAudioProgress(val);
+                      }}
+                      className="w-full accent-indigo-500"
+                    />
+                    <div className="flex justify-between font-mono">
+                      <span>{formatTime(audioProgress)}</span>
+                      <span>{formatTime(audioDuration)}</span>
+                    </div>
+                  </div>
+
+                  {/* 🎧 Actual Audio Element */}
+                  <audio
+                    ref={audioRef}
+                    onTimeUpdate={() => {
+                      if (audioRef.current)
+                        setAudioProgress(audioRef.current.currentTime);
+                    }}
+                    onLoadedMetadata={() => {
+                      if (audioRef.current)
+                        setAudioDuration(audioRef.current.duration || 0);
+                    }}
+                    onEnded={() => {
+                      setSpeaking(false);
+                      setAudioProgress(0);
+                    }}
+                    controls={false}
+                  />
+                </div>
 
                 {/* 🔗 Original Article */}
                 <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
