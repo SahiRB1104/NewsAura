@@ -15,6 +15,7 @@ import Login from "./components/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./components/ForgotPassword";
+import Feedback from "./pages/Feedback";
 
 
 function AppContent() {
@@ -66,7 +67,14 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-          
+           <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute>
+                <Feedback />
+              </ProtectedRoute>
+            }
+          />
           
         
 

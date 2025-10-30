@@ -40,7 +40,7 @@ const pollyVoiceMap = {
 
 // 🧩 gTTS supported languages
 const gttsSupported = [
-  "bn","gu","kn","ml","ta","te","ur",
+  "bn","gu","kn","ta","te","ur",
   "fr","de","es","it","ja","ko","zh-CN","ru","ar"
 ];
 

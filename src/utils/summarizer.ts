@@ -1,3 +1,6 @@
+import axios from "axios";
+import * as cheerio from "cheerio";
+
 const extractMainContent = async (url: string): Promise<string> => {
   try {
     const response = await axios.get(url);

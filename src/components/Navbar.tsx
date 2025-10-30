@@ -133,6 +133,16 @@ const Navbar: React.FC = () => {
                     Profile
                   </button>
                   <button
+                    onClick={() => {
+                      navigate("/feedback");
+                      setIsDropdownOpen(false);
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-emerald-700 hover:bg-emerald-50 transition"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    feedback
+                  </button>
+                  <button
                     onClick={handleLogout}
                     className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50 transition"
                   >

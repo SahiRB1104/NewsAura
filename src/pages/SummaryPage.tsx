@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
-import { ArrowLeft, BookOpen, ExternalLink, Square, Volume2, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  ExternalLink,
+  Square,
+  Volume2,
+  Loader2,
+  Send,
+} from "lucide-react";
 import { useArticleSummary } from "../hooks/useArticleSummary";
+import { auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import toast from "react-hot-toast";
 
 const categoryColors = {
   top: "from-blue-500 to-purple-500",
@@ -14,18 +25,14 @@ const categoryColors = {
 
 // 🌍 Supported Languages
 const supportedLanguages: Record<string, string> = {
-  // 🇮🇳 Indian
   en: "English",
   hi: "Hindi",
   bn: "Bengali",
   gu: "Gujarati",
   kn: "Kannada",
-  ml: "Malayalam",
   ta: "Tamil",
   te: "Telugu",
   ur: "Urdu",
-
-  // 🌐 Global
   fr: "French",
   de: "German",
   es: "Spanish",
@@ -67,6 +74,11 @@ const SummaryPage = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const isTtsSupported = supportedTtsLanguages.includes(language);
+
+  // 💬 Comments
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [user, setUser] = useState<any>(null);
 
   // 📊 Word count
   const wordCount = (translatedSummary || summary?.content || "")
@@ -114,7 +126,7 @@ const SummaryPage = () => {
   // 🎤 Generate TTS
   const handleSpeak = async () => {
     const textToSpeak = translatedSummary || summary?.content;
-    if (!textToSpeak || !isTtsSupported) return;
+    if (!textToSpeak || !isTtsSupported) return console.log("TTS not supported");
 
     try {
       if (audioRef.current) {
@@ -172,10 +184,51 @@ const SummaryPage = () => {
     }
   };
 
+  // 👤 User session
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  // 💬 Fetch comments
+  useEffect(() => {
+    const fetchComments = async () => {
+      const res = await fetch(`http://localhost:3000/api/comments/${id}`);
+      const data = await res.json();
+      setComments(data);
+    };
+    fetchComments();
+  }, [id]);
+
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim()) return toast.error("Enter a comment");
+
+    try {
+      await fetch("http://localhost:3000/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleId: id,
+          articleTitle: summary?.title,
+          user: user?.displayName || "Anonymous",
+          email: user?.email || "Unknown",
+          text: commentText,
+        }),
+      });
+      setCommentText("");
+      toast.success("Comment added!");
+      const res = await fetch(`http://localhost:3000/api/comments/${id}`);
+      setComments(await res.json());
+    } catch {
+      toast.error("Failed to post comment");
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        {/* 🔙 Back */}
+    <div className="min-h-screen bg-gray-50 py-8 flex">
+      {/* ---------- MAIN SUMMARY SECTION ---------- */}
+      <div className="max-w-3xl mx-auto px-4 flex-1">
         <Link
           to={`/category/${category}`}
           className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-8 group"
@@ -224,21 +277,25 @@ const SummaryPage = () => {
                     className="px-3 py-2 border rounded-lg shadow bg-white text-gray-700 min-w-[180px]"
                   >
                     <optgroup label="🇮🇳 Indian Languages">
-                      {["en", "hi", "bn", "gu", "kn", "ml", "ta", "te", "ur"].map((code) => (
+                      {["en", "hi", "bn", "gu", "kn", "ta", "te", "ur"].map((code) => (
                         <option key={code} value={code}>
                           {supportedLanguages[code]}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="🌐 Global Languages">
-                      {["fr", "de", "es", "it", "ja", "ko", "zh-CN", "ru", "ar"].map((code) => (
-                        <option key={code} value={code}>
-                          {supportedLanguages[code]}
-                        </option>
-                      ))}
+                      {["fr", "de", "es", "it", "ja", "ko", "zh-CN", "ru", "ar"].map(
+                        (code) => (
+                          <option key={code} value={code}>
+                            {supportedLanguages[code]}
+                          </option>
+                        )
+                      )}
                     </optgroup>
                   </select>
-                  {translating && <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />}
+                  {translating && (
+                    <Loader2 className="h-5 w-5 text-gray-500 animate-spin" />
+                  )}
                   <span className="text-sm text-gray-600 ml-4">
                     Words: <strong>{wordCount}</strong>
                   </span>
@@ -314,7 +371,6 @@ const SummaryPage = () => {
                     </div>
                   </div>
 
-                  {/* 🎧 Actual Audio Element */}
                   <audio
                     ref={audioRef}
                     onTimeUpdate={() => {
@@ -351,6 +407,48 @@ const SummaryPage = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ---------- COMMENT SECTION ---------- */}
+      <div className="hidden md:flex fixed right-4 top-20 bottom-4 w-[360px] bg-white rounded-2xl shadow-xl border border-gray-200 flex-col overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold p-3">
+          Comments
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {comments.length === 0 && (
+            <p className="text-gray-500 text-sm text-center mt-4">
+              No comments yet
+            </p>
+          )}
+          {comments.map((c, i) => (
+            <div key={i} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+              <p className="text-sm text-gray-800">{c.text}</p>
+              <p className="text-[11px] text-gray-500 mt-1">
+                — {c.user} • {new Date(c.createdAt).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <form
+          onSubmit={handleCommentSubmit}
+          className="border-t border-gray-200 p-3 flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write a comment..."
+            className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-400 outline-none"
+          />
+          <button
+            type="submit"
+            className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
       </div>
     </div>
   );

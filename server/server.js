@@ -5,11 +5,13 @@
   import NodeCache from 'node-cache';
   import crypto from 'crypto';
   import { generateAdvancedSummary } from './summarizer.js';
- 
+  import mongoose from "mongoose";
   import dotenv from "dotenv";
+  import commentRoutes from "./routes/comments.js";
   import sentimentRoutes from "./routes/sentimentRoutes.js";
   import translateRouter from "./routes/translate.js";
   import ttsRoute from "./routes/tts.js"; 
+  import feedbackRoutes from "./routes/feedback.js";
 
 
   dotenv.config();
@@ -21,11 +23,19 @@
   app.use(cors());
   app.use(express.json());
 
+    // MongoDB connection
+  mongoose.connect(process.env.MONGO)
+    .then(() => console.log("✅ MongoDB connected"))
+    .catch((err) => console.error("❌ MongoDB error:", err));
+
+  // Routes
+  app.use("/api/feedback", feedbackRoutes);
 
   app.use("/api/sentiment", sentimentRoutes);
   app.use("/api/tts", ttsRoute);
   app.use("/api/translate", translateRouter);
   app.use("/tts", express.static("./tmp_tts"));
+  app.use("/api/comments", commentRoutes);
 
   // CORS configuration
   app.use((req, res, next) => {
@@ -54,11 +64,7 @@
 
 const newsSources = {
   top: [
-    {
-      name: 'Times of India',
-      url: 'https://timesofindia.indiatimes.com/rssfeedstopstories.cms',
-      type: 'rss'
-    },
+    
     {
       name: 'NDTV',
       url: 'https://feeds.feedburner.com/ndtvnews-top-stories',

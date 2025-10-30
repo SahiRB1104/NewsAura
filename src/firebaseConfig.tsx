@@ -1,8 +1,10 @@
 // src/firebaseConfig.ts
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
+// ✅ Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyC56lNOQGSO16hDulLSLgUBQK4qbuqKMyU",
   authDomain: "newsaura-1c228.firebaseapp.com",
@@ -16,11 +18,14 @@ const firebaseConfig = {
 // ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// ✅ Initialize Firebase Authentication and Google Provider
+// ✅ Firebase Auth & Google Sign-In
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// ✅ Initialize Analytics (only if supported)
+// ✅ Firestore (for storing feedback)
+export const db = getFirestore(app);
+
+// ✅ Analytics (conditionally)
 isSupported().then((supported) => {
   if (supported) {
     getAnalytics(app);
