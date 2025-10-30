@@ -1,12 +1,17 @@
 
-import { useParams } from 'react-router-dom';
-import ArticleGrid from '../components/ArticleGrid';
-import { useArticles, Category } from '../hooks/useArticles';
+import { useParams } from "react-router-dom";
+import ArticleGrid from "../components/ArticleGrid";
+import { useArticles } from "../hooks/useArticles";
+import { Category } from "../types";
 
-const HomePage = () => {
-  // Assert that category is of type Category
-  const { category = 'top' } = useParams<{ category?: Category }>();
-  const { articles, loading, error } = useArticles(category);
+
+interface HomePageProps {
+  refreshTrigger: number;
+}
+
+const HomePage: React.FC<HomePageProps> = ({ refreshTrigger }) => {
+  const { category = "top" } = useParams<{ category?: Category }>();
+  const { articles, loading, error } = useArticles(category, refreshTrigger);
 
   if (loading) {
     return (

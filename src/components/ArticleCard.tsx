@@ -1,7 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Calendar, Tag, ExternalLink, FileText } from "lucide-react";
+import {
+  Calendar,
+  Tag,
+  ExternalLink,
+  FileText,
+  Share2,
+  Bookmark,
+  BookmarkCheck,
+  X,
+} from "lucide-react";
 import axios from "axios";
+import { getAuth } from "firebase/auth";
+const auth = getAuth();
+// import { useAuth } from "../context/AuthContext"; // Uncomment if you have auth context
 
 const categoryColors = {
   top: "bg-gradient-to-r from-blue-500 to-purple-500",
@@ -45,25 +57,26 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article }) => {
   const [loadingSentiment, setLoadingSentiment] = useState(true);
   const [errorSentiment, setErrorSentiment] = useState<string | null>(null);
 
-  // ✅ Generate a concise summary (~40 words, no repetition)
+  const [showShare, setShowShare] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  // const { user } = useAuth(); // If you have auth
+
+  // ✅ Generate concise summary (~40 words)
   const generateSummary = (title: string, description?: string) => {
     const text = description && description.trim() !== "" ? description : title;
     const words = text.trim().split(/\s+/);
     return words.length > 40 ? words.slice(0, 40).join(" ") + "..." : words.join(" ");
   };
-
   const shortSummary = generateSummary(article.title, article.description);
 
-  // ✅ Fetch sentiment from backend (POST /api/sentiment)
+  // ✅ Fetch sentiment
   useEffect(() => {
     const fetchSentiment = async () => {
       try {
         setLoadingSentiment(true);
-
         const response = await axios.post(`${API_BASE_URL}/sentiment`, {
           content: article.description || article.title,
         });
-
         setSentiment(response.data);
         setErrorSentiment(null);
       } catch (err) {
@@ -73,11 +86,10 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article }) => {
         setLoadingSentiment(false);
       }
     };
-
     fetchSentiment();
   }, [article.id]);
 
-  // ✅ Sentiment emoji + label
+  // ✅ Display sentiment label
   const getSentimentDisplay = (sentiment: string) => {
     switch (sentiment) {
       case "Positive":
@@ -89,8 +101,74 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article }) => {
     }
   };
 
+  // 🔖 Bookmark handler
+  const handleBookmark = async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    alert("Please log in to save articles!");
+    return;
+  }
+
+  try {
+    await axios.post(`${API_BASE_URL}/bookmarks`, {
+      userId: user.uid,
+      username: user.displayName || user.email, // 👤 store name or email
+      article,
+    });
+    setBookmarked(true);
+  } catch (err) {
+    console.error("Bookmark error:", err);
+  }
+};
+
+  // 📤 Share logic
+  const message = `${article.title}\n\n${shortSummary}\n\nRead more: ${article.sourceUrl}`;
+
+  const shareLinks = [
+    {
+      name: "WhatsApp",
+      url: `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`,
+      color: "bg-green-500",
+    },
+    {
+      name: "Facebook",
+      url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        article.sourceUrl
+      )}&quote=${encodeURIComponent(article.title + " — " + shortSummary)}`,
+      color: "bg-blue-600",
+    },
+    {
+      name: "Instagram",
+      url: `https://www.instagram.com/?url=${encodeURIComponent(article.sourceUrl)}`,
+      color: "bg-pink-500",
+    },
+    {
+      name: "Twitter/X",
+      url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+        `${article.title}\n${shortSummary}\n${article.sourceUrl}`
+      )}`,
+      color: "bg-black",
+    },
+  ];
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: article.title,
+          text: `${shortSummary}\n\nRead more: ${article.sourceUrl}`,
+          url: article.sourceUrl,
+        });
+      } catch (err) {
+        console.error("Share cancelled or failed", err);
+      }
+    } else {
+      setShowShare(!showShare);
+    }
+  };
+
   return (
-    <div className="group relative bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl h-[480px] flex flex-col">
+    <div className="group relative bg-white rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl h-[500px] flex flex-col">
       {/* 🖼 Image + category/date */}
       <div className="relative">
         <div className="aspect-w-16 aspect-h-9 h-[180px] overflow-hidden">
@@ -154,6 +232,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article }) => {
             <ExternalLink className="h-3 w-3 mr-1" />
             Read More
           </a>
+
           <button
             onClick={() =>
               navigate(`/summary/${article.id}`, {
@@ -165,6 +244,51 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article }) => {
             <FileText className="h-3 w-3 mr-1" />
             Summarize
           </button>
+
+          {/* 🔖 Bookmark */}
+          <button
+            onClick={handleBookmark}
+            className={`p-2 rounded-lg border ${
+              bookmarked ? "bg-yellow-400 text-white" : "bg-gray-100 text-gray-700"
+            } hover:scale-105 transition`}
+            title="Save for later"
+          >
+            {bookmarked ? (
+              <BookmarkCheck className="h-4 w-4" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+          </button>
+
+          {/* 📤 Share */}
+          <div className="relative">
+            <button
+              onClick={handleNativeShare}
+              className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:scale-105 transition"
+              title="Share article"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+
+            {showShare && (
+              <div className="absolute right-0 mt-2 bg-white shadow-md rounded-lg p-2 flex gap-2 z-20">
+                {shareLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${link.color} text-white px-2 py-1 rounded-md text-xs hover:opacity-90`}
+                  >
+                    {link.name}
+                  </a>
+                ))}
+                <button onClick={() => setShowShare(false)}>
+                  <X className="h-4 w-4 text-gray-500" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

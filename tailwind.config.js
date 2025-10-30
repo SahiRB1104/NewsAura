@@ -10,6 +10,8 @@ export default {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'fade-slide-up': 'fadeSlideUp 0.5s ease-out',
         'slide-in': 'slideIn 0.5s ease-out',
+        // 👇 Add this line for dropdown animation
+        'dropdown-fade': 'dropdownFade 0.25s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -33,6 +35,11 @@ export default {
           '100%': {
             transform: 'translateX(0)',
           },
+        },
+        // 👇 Add this keyframe for dropdown effect
+        dropdownFade: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
     },

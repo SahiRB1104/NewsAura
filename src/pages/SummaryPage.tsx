@@ -13,6 +13,7 @@ import { useArticleSummary } from "../hooks/useArticleSummary";
 import { auth } from "../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import toast from "react-hot-toast";
+import CommentSection from "../components/CommentSection";
 
 const categoryColors = {
   top: "from-blue-500 to-purple-500",
@@ -39,7 +40,6 @@ const supportedLanguages: Record<string, string> = {
   it: "Italian",
   ja: "Japanese",
   ko: "Korean",
-  "zh-CN": "Chinese (Simplified)",
   ru: "Russian",
   ar: "Arabic",
 };
@@ -403,6 +403,43 @@ const SummaryPage = () => {
                     </a>
                   )}
                 </div>
+                {/* 🕒 Read Later Button */}
+{user && (
+  <div className="mt-6 text-center">
+    <button
+      onClick={async () => {
+        try {
+          const res = await fetch("http://localhost:3000/api/readlater", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.uid,
+              username: user.displayName || "Anonymous",
+              article: {
+                id,
+                title: summary?.title,
+                description: summary?.content?.slice(0, 150) + "...",
+                imageUrl: article?.imageUrl,
+                category,
+                pubDate: new Date().toISOString(),
+              },
+            }),
+          });
+
+          if (!res.ok) throw new Error("Failed to save");
+          toast.success("Saved to Read Later 📖");
+        } catch {
+          toast.error("Failed to save article");
+        }
+      }}
+      className="inline-flex items-center px-6 py-2 bg-emerald-500 text-white rounded-lg shadow hover:bg-emerald-600 transition-all duration-200"
+    >
+      <BookOpen className="h-4 w-4 mr-2" />
+      Save for Later
+    </button>
+  </div>
+)}
+
               </div>
             </div>
           </div>
@@ -410,46 +447,10 @@ const SummaryPage = () => {
       </div>
 
       {/* ---------- COMMENT SECTION ---------- */}
-      <div className="hidden md:flex fixed right-4 top-20 bottom-4 w-[360px] bg-white rounded-2xl shadow-xl border border-gray-200 flex-col overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold p-3">
-          Comments
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {comments.length === 0 && (
-            <p className="text-gray-500 text-sm text-center mt-4">
-              No comments yet
-            </p>
-          )}
-          {comments.map((c, i) => (
-            <div key={i} className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-              <p className="text-sm text-gray-800">{c.text}</p>
-              <p className="text-[11px] text-gray-500 mt-1">
-                — {c.user} • {new Date(c.createdAt).toLocaleString()}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <form
-          onSubmit={handleCommentSubmit}
-          className="border-t border-gray-200 p-3 flex items-center gap-2"
-        >
-          <input
-            type="text"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write a comment..."
-            className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-400 outline-none"
-          />
-          <button
-            type="submit"
-            className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition"
-          >
-            <Send className="h-4 w-4" />
-          </button>
-        </form>
-      </div>
+      <CommentSection
+  articleId={id!}
+  articleTitle={summary?.title}
+/>
     </div>
   );
 };

@@ -12,6 +12,8 @@
   import translateRouter from "./routes/translate.js";
   import ttsRoute from "./routes/tts.js"; 
   import feedbackRoutes from "./routes/feedback.js";
+  import bookmarkRoutes from "./routes/bookmarks.js";
+  import readLaterRoutes from "./routes/readLaterRoutes.js";
 
 
   dotenv.config();
@@ -36,6 +38,8 @@
   app.use("/api/translate", translateRouter);
   app.use("/tts", express.static("./tmp_tts"));
   app.use("/api/comments", commentRoutes);
+  app.use("/api/bookmarks", bookmarkRoutes);
+  app.use("/api/readlater", readLaterRoutes);
 
   // CORS configuration
   app.use((req, res, next) => {
@@ -102,11 +106,7 @@ const newsSources = {
       url: 'https://www.moneycontrol.com/rss/marketreports.xml',
       type: 'rss'
     },
-    {
-      name: 'Business Standard',
-      url: 'https://www.business-standard.com/rss/markets-106.rss',
-      type: 'rss'
-    },
+    
     {
       name: 'Financial Express',
       url: 'https://www.financialexpress.com/market/feed/',
@@ -156,11 +156,7 @@ const newsSources = {
     }
   ],
   sports: [
-    {
-      name: 'ESPN Cricinfo',
-      url: 'https://www.espncricinfo.com/rss/content/story/feeds/0.xml',
-      type: 'rss'
-    },
+    
     {
       name: 'Sports NDTV',
       url: 'https://sports.ndtv.com/rss/all',
@@ -171,11 +167,7 @@ const newsSources = {
       url: 'https://www.sportskeeda.com/feed/cricket',
       type: 'rss'
     },
-    {
-      name: 'Cricket Next',
-      url: 'https://www.news18.com/rss/cricketnext.xml',
-      type: 'rss'
-    },
+    
     {
       name: 'Times Sports',
       url: 'https://timesofindia.indiatimes.com/rssfeeds/4719148.cms',
@@ -208,11 +200,7 @@ const newsSources = {
       url: 'https://www.bollywoodlife.com/feed',
       type: 'rss'
     },
-    {
-      name: 'TOI Entertainment',
-      url: 'https://timesofindia.indiatimes.com/rssfeeds/1081479906.cms',
-      type: 'rss'
-    },
+    
     {
       name: 'NDTV Movies',
       url: 'https://feeds.feedburner.com/ndtvmovies-latest',
@@ -225,21 +213,13 @@ const newsSources = {
       url: 'https://doctor.ndtv.com/rss/all',
       type: 'rss'
     },
-    {
-      name: 'TOI Health',
-      url: 'https://timesofindia.indiatimes.com/rssfeeds/3908999.cms',
-      type: 'rss'
-    },
+    
     {
       name: 'India Today Health',
       url: 'https://www.indiatoday.in/rss/1206585',
       type: 'rss'
     },
-    {
-      name: 'ET Health',
-      url: 'https://health.economictimes.indiatimes.com/rss/topstories',
-      type: 'rss'
-    },
+    
     {
       name: 'Medical Dialogues',
       url: 'https://medicaldialogues.in/feed',
@@ -292,7 +272,7 @@ async function parseRSSFeed(source, category) {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
               },
-              timeout: 5000
+              timeout: 15000
             });
             const article$ = cheerio.load(articleResponse.data);
             imageUrl = await extractImageFromArticle(article$, source.name);
@@ -702,7 +682,7 @@ app.get('/api/news/:category', async (req, res) => {
     const articles = articlesArrays
       .flat()
       .sort(() => Math.random() - 0.5)
-      .slice(0, 20);
+      .slice(0, 40);
     
     console.log(`Final articles count: ${articles.length}`);
     

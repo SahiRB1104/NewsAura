@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   Newspaper,
   Menu,
@@ -8,6 +8,9 @@ import {
   ChevronDown,
   LogOut,
   User,
+  Bookmark,
+  MessageCircle,
+  BookOpen,
 } from "lucide-react";
 import {
   signOut,
@@ -25,12 +28,13 @@ const categories = [
   { id: "technology" },
 ];
 
-const Navbar: React.FC = () => {
+const Navbar: React.FC<{ onRefresh: () => void }> = ({ onRefresh }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
@@ -41,7 +45,7 @@ const Navbar: React.FC = () => {
     navigate("/login");
   };
 
-  // ✅ Detect Firebase logged-in user
+  // ✅ Track logged-in Firebase user
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -49,7 +53,7 @@ const Navbar: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Close dropdown when clicked outside
+  // ✅ Close dropdown if click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -64,12 +68,13 @@ const Navbar: React.FC = () => {
   }, []);
 
   const displayName = currentUser?.displayName || "User";
+  
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
-          {/* Brand */}
+          {/* 📰 Brand */}
           <NavLink
             to="/category/top"
             className="flex items-center transform hover:scale-105 transition-transform duration-200"
@@ -83,7 +88,17 @@ const Navbar: React.FC = () => {
             </span>
           </NavLink>
 
-          {/* Mobile Toggle */}
+          {/* 🔄 Refresh News Button */}
+          <button
+            onClick={onRefresh}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-md transition-all duration-200 ml-3"
+          >
+            🔄 Refresh News
+          </button>
+
+
+
+          {/* 📱 Mobile Menu Toggle */}
           <button
             onClick={toggleMenu}
             className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-white hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-white/50"
@@ -91,7 +106,7 @@ const Navbar: React.FC = () => {
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
 
-          {/* Desktop Menu */}
+          {/* 💻 Desktop Menu */}
           <div className="hidden md:flex items-center space-x-2">
             {categories.map(({ id }) => (
               <NavLink
@@ -109,7 +124,7 @@ const Navbar: React.FC = () => {
               </NavLink>
             ))}
 
-            {/* ✅ User Dropdown */}
+            {/* 👤 User Dropdown */}
             <div className="relative ml-4" ref={dropdownRef}>
               <button
                 onClick={toggleDropdown}
@@ -121,33 +136,72 @@ const Navbar: React.FC = () => {
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-md overflow-hidden animate-fadeIn">
+                <div
+                  className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg overflow-hidden 
+                             border border-gray-100 animate-dropdown-fade"
+                >
+                  {/* Profile */}
                   <button
                     onClick={() => {
                       navigate("/profile");
                       setIsDropdownOpen(false);
                     }}
-                    className="flex items-center w-full px-4 py-2 text-emerald-700 hover:bg-emerald-50 transition"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-emerald-700 hover:bg-emerald-50 transition-all duration-200"
                   >
-                    <User className="h-4 w-4 mr-2" />
-                    Profile
+                    <User className="h-4 w-4" />
+                    <span>Profile</span>
                   </button>
+
+                  {/* Feedback */}
                   <button
                     onClick={() => {
                       navigate("/feedback");
                       setIsDropdownOpen(false);
                     }}
-                    className="flex items-center w-full px-4 py-2 text-emerald-700 hover:bg-emerald-50 transition"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-emerald-700 hover:bg-emerald-50 transition-all duration-200"
                   >
-                    <User className="h-4 w-4 mr-2" />
-                    feedback
+                    <MessageCircle className="h-4 w-4" />
+                    <span>Feedback</span>
                   </button>
+
+                  {/* My Bookmarks */}
+                  <button
+                    onClick={() => {
+                      navigate("/bookmarks");
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`flex items-center gap-2 w-full px-4 py-2.5 transition-all duration-200 ${
+                      location.pathname.includes("bookmarks")
+                        ? "bg-emerald-50 text-emerald-700 font-semibold border-l-4 border-emerald-500"
+                        : "text-emerald-700 hover:bg-emerald-50 border-l-4 border-transparent"
+                    }`}
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    <span>My Bookmarks</span>
+                  </button>
+                  {/* Read Later */}
+                    <button
+                      onClick={() => {
+                        navigate("/readlater");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`flex items-center gap-2 w-full px-4 py-2.5 transition-all duration-200 ${
+                        location.pathname.includes("readlater")
+                          ? "bg-emerald-50 text-emerald-700 font-semibold border-l-4 border-emerald-500"
+                          : "text-emerald-700 hover:bg-emerald-50 border-l-4 border-transparent"
+                      }`}
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      <span>Read Later</span>
+                    </button>
+
+                  {/* Logout */}
                   <button
                     onClick={handleLogout}
-                    className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50 transition"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-red-600 hover:bg-red-50 transition-all duration-200"
                   >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
                   </button>
                 </div>
               )}
@@ -156,7 +210,7 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* 📱 Mobile Dropdown Menu */}
       {isOpen && (
         <div className="md:hidden bg-emerald-600 bg-opacity-95 shadow-lg rounded-b-xl transition-all">
           <div className="px-4 py-3 space-y-2 flex flex-col items-start">
@@ -177,7 +231,7 @@ const Navbar: React.FC = () => {
               </NavLink>
             ))}
 
-            {/* Mobile User Info + Logout */}
+            {/* Mobile User Info */}
             <div className="flex items-center gap-2 mt-3 px-3 text-white font-medium">
               <UserCircle2 className="h-5 w-5" />
               <span>{displayName}</span>

@@ -1,4 +1,3 @@
-
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,6 +6,7 @@ import {
   useLocation,
 } from "react-router-dom";
 
+import { useState } from "react";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import SummaryPage from "./pages/SummaryPage";
@@ -16,10 +16,19 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./components/ForgotPassword";
 import Feedback from "./pages/Feedback";
-
+import MyBookmarks from "./pages/myBookmarks";
+import MyReadLater from "./pages/MyReadLater";
 
 function AppContent() {
   const location = useLocation();
+
+  // 🧠 Add a refresh trigger counter
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // 🔄 Called when Navbar’s Refresh button is clicked
+  const handleRefresh = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   // ✅ Hide Navbar on Login and Register pages
   const hideNavbar =
@@ -27,8 +36,8 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 pt-16">
-      {/* Show Navbar only when user is logged in */}
-      {!hideNavbar && <Navbar />}
+      {/* ✅ Show Navbar only when user is logged in */}
+      {!hideNavbar && <Navbar onRefresh={handleRefresh} />}
 
       <main className={`container mx-auto py-6 ${hideNavbar ? "pt-0" : ""}`}>
         <Routes>
@@ -39,12 +48,14 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+
           {/* Protected Routes */}
           <Route
             path="/category/:category"
             element={
               <ProtectedRoute>
-                <HomePage />
+                {/* 🧩 Pass refreshTrigger down to HomePage */}
+                <HomePage refreshTrigger={refreshTrigger} />
               </ProtectedRoute>
             }
           />
@@ -58,7 +69,7 @@ function AppContent() {
             }
           />
 
-          {/* ✅ Add the Profile route here */}
+          {/* ✅ Profile */}
           <Route
             path="/profile"
             element={
@@ -67,7 +78,9 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-           <Route
+
+          {/* ✅ Feedback */}
+          <Route
             path="/feedback"
             element={
               <ProtectedRoute>
@@ -75,8 +88,26 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
-          
-        
+
+          {/* ✅ Bookmarks */}
+          <Route
+            path="/bookmarks"
+            element={
+              <ProtectedRoute>
+                <MyBookmarks />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ✅ Read Later */}
+          <Route
+            path="/readLater"
+            element={
+              <ProtectedRoute>
+                <MyReadLater />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Catch-all for undefined routes */}
           <Route path="*" element={<Navigate to="/login" replace />} />

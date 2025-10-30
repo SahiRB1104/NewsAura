@@ -1,43 +1,59 @@
-import { useState, useEffect } from 'react';
-import { Article, Category } from '../types';
-import axios from 'axios';
+import { useEffect, useState } from "react";
+import { Article, Category } from "../types";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-console.log('Current API URL:', API_BASE_URL); // Debug log
-
-export const useArticles = (category: Category) => {
+export const useArticles = (category: Category, refreshTrigger = 0) => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchArticles = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        setLoading(true);
-        const url = `${API_BASE_URL}/news/${category}`;
-        console.log('Fetching from:', url); // Debug log
-        const response = await axios.get(url, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
-        setArticles(response.data);
-        setError(null);
-      } catch (err: any) {
-        console.error('Error details:', err); // Debug log
-        setError(err.message || 'Failed to fetch articles');
-        setArticles([]);
+        const response = await fetch(
+          `/api/news/${category}${refreshTrigger > 0 ? "?refresh=true" : ""}`
+        );
+        const data = await response.json();
+
+const formatted: Article[] = data.map((a: any) => {
+  const rawDate = a.pubDate || a.publishedAt;
+  const parsedDate = new Date(rawDate);
+  const validDate = !isNaN(parsedDate.getTime())
+    ? parsedDate.toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: a.id,
+    title: a.title,
+    description: a.description,
+    imageUrl: a.imageUrl,
+    sourceUrl: a.sourceUrl,
+    source: a.source,
+    category: a.category,
+    pubDate: validDate, // ✅ Match ArticleCard.tsx
+  };
+});
+
+
+        // 📰 Optional: newest first
+        setArticles(
+          formatted.sort(
+            (a, b) =>
+              new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+          )
+        );
+      } catch (err) {
+        console.error("Error fetching articles:", err);
+        setError("Failed to fetch articles");
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticles();
-  }, [category]);
+  }, [category, refreshTrigger]);
 
   return { articles, loading, error };
 };
-
-export type { Category };
